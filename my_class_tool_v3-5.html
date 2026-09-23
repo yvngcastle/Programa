@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Моят час — 11V</title>
+<style>
+:root{--bg:#0f172a;--card:#111c33;--muted:#94a3b8;--text:#f8fafc;--accent:#38bdf8;--accent2:#22c55e;--line:#263550;--warn:#f59e0b}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(135deg,#0b1220,#16233d);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1050px;margin:auto;padding:24px}
+header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}
+h1{margin:0;font-size:clamp(26px,5vw,42px)} .sub{color:var(--muted);margin-top:5px}
+select,button{border:1px solid var(--line);background:#17243c;color:var(--text);padding:10px 12px;border-radius:10px;font:inherit}
+.hero{background:rgba(17,28,51,.9);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 18px 50px #0004}
+.label{color:var(--muted);font-size:14px}.subject{font-size:clamp(30px,7vw,58px);font-weight:800;line-height:1.05;margin:8px 0 10px}.time{font-size:20px;color:var(--accent)}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{background:#17243c;border:1px solid var(--line);padding:8px 12px;border-radius:999px}
+#countdown{font-size:18px;color:var(--accent2);font-weight:700;margin-top:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.card{background:rgba(17,28,51,.86);border:1px solid var(--line);border-radius:18px;padding:18px}
+.card h2{margin:0 0 12px;font-size:19px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}.now{background:#12314a;outline:1px solid #38bdf855}
+.small{font-size:13px;color:var(--muted)}.free{color:#64748b}.split{display:block;margin-bottom:5px}.split b{color:#cbd5e1}
+@media(max-width:720px){.wrap{padding:14px}header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}.hero{padding:18px}th:nth-child(1),td:nth-child(1){width:65px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>📚 Моят час — 11V</h1><div class="sub">Автоматично показва часа според деня и текущия час.</div></div>
+  <div class="pill">🎨 Графичен дизайн</div>
+</header>
+
+<section class="hero">
+  <div class="label" id="today"></div>
+  <div class="subject" id="current">Зареждане…</div>
+  <div class="time" id="currentTime"></div>
+  <div id="countdown"></div>
+  <div id="bigBreak" class="pill" style="display:inline-block;margin-top:12px">⏱️ Голямото междучасие: —</div>
+  <div style="margin-top:12px"><button id="notifyBtn">🔔 Включи известия</button><span id="notifyStatus" class="small" style="margin-left:8px"></span></div>
+  <div class="meta">
+    <div class="pill">Следва: <b id="next">—</b></div>
+    <div class="pill">Час № <b id="period">—</b></div>
+  </div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2>Днешно разписание</h2>
+    <table><thead><tr><th>№</th><th>Час</th><th>Предмет</th></tr></thead><tbody id="todayTable"></tbody></table>
+  </section>
+  <section class="card">
+    <h2>Цялата седмица</h2>
+    <div id="week"></div>
+  </section>
+</div>
+</div>
+
+<script>
+const periods = [
+  ["08:00","08:40"],["08:50","09:30"],["09:40","10:20"],["10:45","11:25"],
+  ["11:35","12:15"],["12:25","13:05"],["13:10","13:50"],["13:55","14:35"]
+];
+const dayNames=["Неделя","Понеделник","Вторник","Сряда","Четвъртък","Петък","Събота"];
+
+// The timetable is transcribed from the photographed 11.B schedule.
+// "split" entries are the two subgroup lessons printed in the same period.
+const S = {
+  1: [
+    "Чужд език по професията (ООП)",
+    "Кулинарни техники и технологии — Учебна практика (СПП)",
+    "Кулинарни техники и технологии — Учебна практика (СПП)",
+    "Кулинарни техники и технологии — Учебна практика (СПП)",
+    "Кулинарни техники и технологии — Учебна практика (СПП)",
+    "Математика (ООП)","Час на класа",""
+  ],
+  2: [
+    "Математика (ООП)",
+    "Организация на обслужването в ресторанта — Учебна практика (СПП)",
+    "Организация на обслужването в ресторанта — Учебна практика (СПП)",
+    "Български език и литература (ООП)",
+    "Български език и литература (ООП)",
+    "Кулинарни техники и технологии (СПП)",
+    "Организация на обслужването в ресторанта — Учебна практика (СПП)",""
+  ],
+  3: [
+    "Български език и литература (ООП)",
+    "Български език и литература (ООП)",
+    "Физическо възпитание и спорт (ООП)",
+    {rest:"Кулинарни техники и технологии (СПП)",kt:"История на изкуството (ООП)"},
+    "Гражданско образование (ООП)",
+    {rest:"Кулинарни техники и технологии — Учебна практика (СПП)",kt:"Компютърна графика и мултимедия (ОПТ)"},
+    {rest:"Кулинарни техники и технологии — Учебна практика (СПП)",kt:"Графичен дизайн (СПП)"},
+    "Спортни дейности — волейбол"
+  ],
+  4: [
+    "Чужд език по професията (ООП)",
+    {rest:"Гостоприемство в туристическата индустрия (ОПТ)",kt:"Компютърна графика и мултимедия — учебна практика (СПП)"},
+    {rest:"Кулинарни техники и технологии (СПП)",kt:"История на изкуството (ООП)"},
+    "Немски език (ООП)",
+    "Немски език (ООП)",
+    {rest:"Организация на обслужването в ресторанта (СПП)",kt:"Графичен дизайн — учебна практика (СПП)"},
+    "",""
+  ],
+  5: [
+    "Организация на обслужването в ресторанта (СПП)",
+    "Физическо възпитание и спорт (ООП)",
+    {rest:"Кулинарни техники и технологии (СПП)",kt:"Графичен дизайн — учебна практика (СПП)"},
+    {rest:"Кулинарни техники и технологии — Учебна практика (СПП)",kt:"Графичен дизайн и реклама — учебна практика (СПП)"},
+    {rest:"Кулинарни техники и технологии — Учебна практика (СПП)",kt:"Графичен дизайн и реклама — учебна практика (СПП)"},
+    {rest:"Кулинарни техники и технологии — Учебна практика (СПП)",kt:"Графичен дизайн и реклама — учебна практика (СПП)"},
+    "",""
+  ]
+};
+
+function lesson(day, i){
+  const x=(S[day]||[])[i];
+  if(!x) return "";
+  if(typeof x==="object") return x.kt || "";
+  const culinaryOnly = /Кулинар|ресторанта|Гостоприемство|обслужването в ресторанта/.test(x);
+  return culinaryOnly ? "" : x;
+}
+function mins(hm){const [h,m]=hm.split(":").map(Number);return h*60+m}
+function nowM(d){return d.getHours()*60+d.getMinutes()+d.getSeconds()/60}
+
+let notifiedKey = localStorage.getItem("lastClassNotification") || "";
+const notifyBtn=document.getElementById("notifyBtn");
+const notifyStatus=document.getElementById("notifyStatus");
+function updateNotifyUI(){
+  if(!("Notification" in window)){ notifyBtn.disabled=true; notifyStatus.textContent="Известията не се поддържат в този браузър."; return; }
+  if(Notification.permission==="granted"){ notifyStatus.textContent="Известията са включени."; notifyBtn.textContent="🔔 Известията са включени"; }
+  else if(Notification.permission==="denied"){ notifyStatus.textContent="Разреши известията от настройките на браузъра."; }
+  else notifyStatus.textContent="Ще получиш известие 5 минути преди часа.";
+}
+notifyBtn.addEventListener("click", async()=>{
+  if("Notification" in window){ try{ await Notification.requestPermission(); }catch(e){} }
+  updateNotifyUI();
+});
+updateNotifyUI();
+
+
+function notifyUpcoming(day, i){
+  if(i < 0 || i > 7) return;
+  const name=lesson(day,i);
+  if(!name || !("Notification" in window) || Notification.permission !== "granted") return;
+  const key=`${new Date().toDateString()}-${periods[i][0]}-${name}`;
+  if(notifiedKey===key) return;
+  new Notification(`Следва час №${i+1}`, {body:`След 5 минути: ${name}`});
+  notifiedKey=key;
+  localStorage.setItem("lastClassNotification",key);
+}
+
+function updateBigBreak(m){
+  const el=document.getElementById("bigBreak");
+  const a=mins("10:20"), b=mins("10:45");
+  let sec,mm,ss;
+  if(m<a){ sec=Math.ceil((a-m)*60); mm=Math.floor(sec/60); ss=sec%60; el.textContent=`⏱️ Голямото междучасие след ${mm}:${String(ss).padStart(2,"0")}`; }
+  else if(m<b){ sec=Math.ceil((b-m)*60); mm=Math.floor(sec/60); ss=sec%60; el.textContent=`⏱️ Голямо междучасие — остават ${mm}:${String(ss).padStart(2,"0")}`; }
+  else el.textContent="⏱️ Голямото междучасие приключи";
+}
+
+function render(){
+  const d=new Date(), day=d.getDay(), m=nowM(d);
+  document.getElementById("today").textContent =
+    `${dayNames[day]} · ${d.toLocaleDateString("bg-BG",{day:"2-digit",month:"2-digit",year:"numeric"})}`;
+  document.getElementById("currentTime").textContent =
+    d.toLocaleTimeString("bg-BG",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  updateBigBreak(m);
+
+  const arr=S[day]||[];
+  let active=-1, next=-1;
+  for(let i=0;i<8;i++){
+    if(m>=mins(periods[i][0]) && m<mins(periods[i][1])) active=i;
+    if(next<0 && m<mins(periods[i][0])) next=i;
+  }
+  const current=active>=0?lesson(day,active):"";
+  if(next>=0 && Math.abs(m-(mins(periods[next][0])-5)) < 1) notifyUpcoming(day,next);
+  if(active>=0){
+    document.getElementById("current").textContent=current||"Нямаме час";
+    document.getElementById("period").textContent=active+1;
+    const left=Math.max(0,Math.ceil(mins(periods[active][1])-m));
+    document.getElementById("countdown").textContent=left===1?"Остава 1 минута":`Остават ${left} минути`;
+  }else{
+    document.getElementById("current").textContent =
+      (day>=1&&day<=5&&next>=0) ? "Няма час в момента" : "Почивен ден";
+    document.getElementById("period").textContent="—";
+    document.getElementById("countdown").textContent =
+      next>=0 ? `Следващият час започва в ${periods[next][0]}` : "Няма повече часове днес.";
+  }
+  document.getElementById("next").textContent = next>=0 ? (lesson(day,next)||"Нямаме час") : "—";
+
+  const tb=document.getElementById("todayTable"); tb.innerHTML="";
+  for(let i=0;i<8;i++){
+    const tr=document.createElement("tr"); if(i===active)tr.className="now";
+    tr.innerHTML=`<td>${i+1}</td><td>${periods[i][0]}–${periods[i][1]}</td><td class="${lesson(day,i)?'':'free'}">${lesson(day,i)||"Нямаме час"}</td>`;
+    tb.appendChild(tr);
+  }
+
+  const wk=document.getElementById("week"); wk.innerHTML="";
+  for(let dayNo=1;dayNo<=5;dayNo++){
+    const box=document.createElement("div"); box.style.marginBottom="14px";
+    let rows=`<div style="font-weight:800;margin-bottom:5px">${dayNames[dayNo]}</div>`;
+    for(let i=0;i<8;i++){
+      const l=lesson(dayNo,i);
+      rows+=`<div class="small ${!l?'free':''}" style="padding:3px 0"><b>${i+1}. ${periods[i][0]}</b> — ${l||"Нямаме час"}</div>`;
+    }
+    box.innerHTML=rows; wk.appendChild(box);
+  }
+}
+render(); setInterval(render,1000);
+</script>
+</body>
+</html>
